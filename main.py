@@ -1,9 +1,10 @@
 import os
 import asyncio
 import logging
-from telegram import Update
-from telegram.ext import Application, CommandHandler
-import features  # ye features/__init__.py ko load karega
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
+from telegram.ext import Application
+import features
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -12,34 +13,40 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("BOT_TOKEN")
-if not TOKEN:
-    logger.error("BOT_TOKEN environment variable not set!")
-    exit(1)
+PORT = int(os.environ.get("PORT", 8000))
+
+# Simple health-check handler
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"NovaX is alive!")
+    def log_message(self, format, *args):
+        pass  # quiet logging
+
+def run_http_server():
+    server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
+    logger.info(f"Health server running on port {PORT}")
+    server.serve_forever()
 
 async def main():
-    # Application banayein
+    # Bot application
     app = Application.builder().token(TOKEN).build()
-
-    # Features folder ke saare handlers register karein
     features.register_all(app)
 
-    # Bot ko start karein (polling)
+    # HTTP server ko alag thread mein daalo
+    Thread(target=run_http_server, daemon=True).start()
+
+    # Polling shuru karo
     logger.info("NovaX is booting up... 🚀")
     await app.initialize()
     await app.start()
     await app.updater.start_polling()
     logger.info("NovaX is alive and kicking! ⚡")
 
-    # Graceful shutdown ke liye
-    stop_signal = asyncio.Future()
-    try:
-        await stop_signal
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
+    # Run forever
+    stop_signal = asyncio.get_event_loop().create_future()
+    await stop_signal
 
 if __name__ == "__main__":
     asyncio.run(main())
