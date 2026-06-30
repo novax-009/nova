@@ -1,1 +1,10 @@
 python-telegram-bot[job-queue]==20.8
+requests
+simpleeval
+python-dateparser
+wikipedia
+translate
+qrcode[pil]
+Pillow
+yfinance
+pytz
